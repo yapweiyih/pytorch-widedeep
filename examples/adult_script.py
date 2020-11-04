@@ -12,16 +12,33 @@ from pytorch_widedeep.callbacks import (
 )
 from pytorch_widedeep.initializers import XavierNormal, KaimingNormal
 from pytorch_widedeep.preprocessing import WidePreprocessor, DensePreprocessor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 use_cuda = torch.cuda.is_available()
 
 if __name__ == "__main__":
-
-    df = pd.read_csv("data/adult/adult.csv.zip")
+    colnames = [
+        "age",
+        "workclass",
+        "fnlwgt",
+        "education",
+        "education-num",
+        "marital-status",
+        "occupation",
+        "relationship",
+        "race",
+        "gender",
+        "capital-gain",
+        "capital-loss",
+        "hours-per-week",
+        "native-country",
+        "income",
+    ]
+    df = pd.read_csv("data/adult/adult.csv", names=colnames, index_col=False)
     df.columns = [c.replace("-", "_") for c in df.columns]
-    df["age_buckets"] = pd.cut(
-        df.age, bins=[16, 25, 30, 35, 40, 45, 50, 55, 60, 91], labels=np.arange(9)
-    )
+
+    df["age_buckets"] = pd.cut(df.age, bins=[16, 25, 30, 35, 40, 45, 50, 55, 60, 91], labels=np.arange(9))
     df["income_label"] = (df["income"].apply(lambda x: ">50K" in x)).astype(int)
     df.drop("income", axis=1, inplace=True)
     df.head()
@@ -97,14 +114,20 @@ if __name__ == "__main__":
         metrics=metrics,
     )
 
-    model.fit(
-        X_wide=X_wide,
-        X_deep=X_deep,
-        target=target,
-        n_epochs=4,
-        batch_size=64,
-        val_split=0.2,
+    X_wide_train, X_wide_test, X_deep_train, X_deep_test, y_train, y_test = train_test_split(
+        X_wide, X_deep, target, test_size=0.2
     )
+
+    model.fit(
+        X_wide=X_wide_train, X_deep=X_deep_train, target=y_train, n_epochs=4, batch_size=64, val_split=0.2,
+    )
+    # # to save/load the model
+    # torch.save(model, "model_weights/model.t")
+    # model = torch.load("model_weights/model.t")
+
+    preds = model.predict(X_wide_test, X_deep_test)
+    accuracy = accuracy_score(y_test, preds)
+    print(accuracy)
     # # to save/load the model
     # torch.save(model, "model_weights/model.t")
     # model = torch.load("model_weights/model.t")
